@@ -4,7 +4,7 @@ import pandas as pd
 import re
 from typing import Optional, Union, List
 import os
-from src.config import STYLE_VARS, PRIMARY_COLOR
+from src.config.config import STYLE_VARS, PRIMARY_COLOR
 
 def dedup_column_names(columns: List[str]) -> List[str]:
     """
@@ -65,24 +65,11 @@ def load_single_year_data(data_folder: str, year: int) -> pd.DataFrame:
         escapechar='\\',     # Handle escaped characters
     )
     
-    # Print original column names for debugging
-    print("\nOriginal columns with detailed info:")
-    for i, col in enumerate(df.columns):
-        print(f"{i+1}. Length: {len(col)}")
-        print(f"   Raw: {repr(col)}")
-        print(f"   Cleaned: {repr(clean_column_name(col))}")
-        print()
-    
     # Clean up column names
     df.columns = [clean_column_name(col) for col in df.columns]
     
     # Handle duplicate column names with our own function
     df.columns = dedup_column_names(list(df.columns))
-    
-    # Print final column names for debugging
-    print("\nFinal cleaned columns:")
-    for i, col in enumerate(df.columns):
-        print(f"{i+1}. {repr(col)}")
     
     return df
 
@@ -207,7 +194,21 @@ def load_data_file(data_file: str) -> pd.DataFrame:
     )
     df.columns = [clean_column_name(col) for col in df.columns]
     # Optionally handle duplicate columns if needed
-    print("\n[DEBUG] All cleaned DataFrame columns:")
-    for col in df.columns:
-        print(repr(col))
-    return df 
+    return df
+
+def clean_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean column names by removing special characters and standardizing format."""
+    # Store original columns for reference
+    original_columns = df.columns.tolist()
+    
+    # Clean each column name
+    cleaned_columns = []
+    for col in original_columns:
+        cleaned_col = clean_column_name(col)
+        cleaned_columns.append(cleaned_col)
+    
+    # Create new DataFrame with cleaned column names
+    df_cleaned = df.copy()
+    df_cleaned.columns = cleaned_columns
+    
+    return df_cleaned 

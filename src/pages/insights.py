@@ -2,26 +2,54 @@
 
 import pandas as pd
 import dash_bootstrap_components as dbc
-from dash import html
+from dash import html, dcc
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 from plotly.colors import qualitative
 import re
+from collections import defaultdict
+import string
 
 from src.components.charts import (
     generate_chart,
     make_donut_chart,
     make_multi_select_bar,
     make_bar_chart,
-    create_no_data_figure
+    create_no_data_figure,
+    make_wordcloud,
+    generate_grouped_bar_chart,
+    generate_task_scale_chart
 )
 from src.components.layout import build_stat_card, build_chart_card
-from src.config import PRIMARY_COLOR, GROUPED_TASK_SCALES
+from src.config.config import PRIMARY_COLOR, GROUPED_TASK_SCALES, GROUPED_QUESTIONS, INSIGHTS_CHARTS
+
+# Phase key mapping to column phase strings
+PHASE_KEY_TO_COLUMN_PHASE = {
+    "Elicitation": "requirements elicitation",
+    "Analysis & Negotiation": "requirements analysis & negotiation", 
+    "Specification / Modeling": "requirements specification / requirements modeling",
+    "Validation / Quality Assurance": "requirements validation / quality assurance",
+    "Management": "requirements management"
+}
+
+SECTION_HEADER_STYLE = {
+    "color": PRIMARY_COLOR,
+    "marginTop": "2.5rem",
+    "marginBottom": "1.2rem",
+    "fontSize": "1.2rem",
+    "fontWeight": 600,
+    "borderBottom": f"2px solid {PRIMARY_COLOR}",
+    "paddingBottom": "0.3rem"
+}
+CARD_ROW_STYLE = "mb-4 g-4"
 
 def normalize_colname(name):
-    # Remove all whitespace (including non-breaking), collapse multiple spaces, and lowercase
-    return re.sub(r'\s+', ' ', name.replace('\xa0', ' ')).strip().lower()
+    # Remove all whitespace, punctuation, and lowercase
+    name = name.replace('\xa0', ' ')
+    name = re.sub(r'\s+', ' ', name)
+    name = name.translate(str.maketrans('', '', string.punctuation))
+    return name.strip().lower()
 
 def create_awareness_implementation_chart(df: pd.DataFrame) -> go.Figure:
     """Create a chart showing relationship between definition awareness and implementation."""
@@ -289,12 +317,6 @@ def create_role_drivers_chart(df: pd.DataFrame) -> go.Figure:
     """Create a chart showing sustainability drivers by role."""
     role_col = "Which of the following best describes your current role in the organization?"
     
-    # Debug: Print all column names to find the exact driver column names
-    print("\nAll columns in DataFrame:")
-    for col in df.columns:
-        if "drive" in col.lower():
-            print(f"Found driver column: {repr(col)}")
-    
     # Use the exact driver columns from JOB_TASK_MULTI_DRIVES
     driver_cols = [
         'What drives you to incorporate digital sustainability in your role-related tasks?  [Organizational policies ]',
@@ -305,17 +327,12 @@ def create_role_drivers_chart(df: pd.DataFrame) -> go.Figure:
     ]
     
     # Verify each driver column exists
-    print("\nVerifying driver columns:")
     available_driver_cols = []
     for col in driver_cols:
         if col in df.columns:
-            print(f"Found: {repr(col)}")
             available_driver_cols.append(col)
-        else:
-            print(f"Missing: {repr(col)}")
     
     if not available_driver_cols:
-        print("No driver columns found. Creating empty chart.")
         fig = go.Figure()
         fig.update_layout(
             title="No driver data available",
@@ -356,10 +373,9 @@ def create_role_drivers_chart(df: pd.DataFrame) -> go.Figure:
                 driver_name = driver_col.split('[')[-1].split(']')[0].strip()
                 driver_percentages[driver_labels.get(driver_name, driver_name)] = contingency["Selected"]
         except Exception as e:
-            print(f"Error processing driver column {driver_col}: {str(e)}")
+            continue
     
     if not driver_percentages:
-        print("No valid driver data found. Creating empty chart.")
         fig = go.Figure()
         fig.update_layout(
             title="No driver data available",
@@ -408,12 +424,6 @@ def create_role_barriers_chart(df: pd.DataFrame) -> go.Figure:
     """Create a chart showing sustainability barriers by role."""
     role_col = "Which of the following best describes your current role in the organization?"
     
-    # Debug: Print all column names to find the exact barrier column names
-    print("\nAll columns in DataFrame:")
-    for col in df.columns:
-        if "hinder" in col.lower():
-            print(f"Found barrier column: {repr(col)}")
-    
     # Use a subset of barriers for better visualization, with exact column names
     barrier_cols = [
         "What hinders you from incorporating sustainability in your role-specific tasks?\xa0  [Lack of knowledge or awareness (e.g., not knowing enough about sustainability impact or best practices)]",
@@ -424,17 +434,12 @@ def create_role_barriers_chart(df: pd.DataFrame) -> go.Figure:
     ]
     
     # Verify each barrier column exists
-    print("\nVerifying barrier columns:")
     available_barrier_cols = []
     for col in barrier_cols:
         if col in df.columns:
-            print(f"Found: {repr(col)}")
             available_barrier_cols.append(col)
-        else:
-            print(f"Missing: {repr(col)}")
     
     if not available_barrier_cols:
-        print("No barrier columns found. Creating empty chart.")
         fig = go.Figure()
         fig.update_layout(
             title="No barrier data available",
@@ -474,14 +479,10 @@ def create_role_barriers_chart(df: pd.DataFrame) -> go.Figure:
             if "Selected" in contingency.columns:
                 barrier_name = barrier_col.split('[')[-1].split(']')[0].strip()
                 barrier_percentages[barrier_labels.get(barrier_name, barrier_name)] = contingency["Selected"]
-            else:
-                print(f"Warning: 'Selected' not found in columns for {barrier_col}")
-                print(f"Available columns: {contingency.columns.tolist()}")
         except Exception as e:
-            print(f"Error processing barrier column {barrier_col}: {str(e)}")
+            continue
     
     if not barrier_percentages:
-        print("No valid barrier data found. Creating empty chart.")
         fig = go.Figure()
         fig.update_layout(
             title="No barrier data available",
@@ -563,7 +564,7 @@ def create_barriers_by_org_type_chart(df: pd.DataFrame) -> go.Figure:
                 barrier_name = barrier_col.split('[')[-1].split(']')[0].strip()
                 barrier_percentages[barrier_labels.get(barrier_name, barrier_name)] = contingency["Selected"]
         except Exception as e:
-            print(f"Error processing barrier column {barrier_col}: {str(e)}")
+            continue
     
     if not barrier_percentages:
         return create_no_data_figure("No barrier data available")
@@ -633,7 +634,7 @@ def create_drivers_by_org_type_chart(df: pd.DataFrame) -> go.Figure:
                 driver_name = driver_col.split('[')[-1].split(']')[0].strip()
                 driver_percentages[driver_labels.get(driver_name, driver_name)] = contingency["Selected"]
         except Exception as e:
-            print(f"Error processing driver column {driver_col}: {str(e)}")
+            continue
     
     if not driver_percentages:
         return create_no_data_figure("No driver data available")
@@ -717,458 +718,147 @@ def create_barriers_drivers_correlation_chart(df: pd.DataFrame) -> go.Figure:
 def make_task_scale_chart(df, phase_key):
     phase = GROUPED_TASK_SCALES[phase_key]
     tasks = phase['tasks']
-    scales = phase['scales']
-    # Build normalized DataFrame columns
-    norm_df_cols = {normalize_colname(col): col for col in df.columns}
-    # Build expected normalized columns
-    columns = [
-        f"In the following, you find a set of key tasks and goals related to REQUIREMENTS {phase_key.upper()}... [{task}][{scale}]"
-        for task in tasks for scale in scales
-    ]
-    actual_cols = []
-    for col in columns:
-        norm_col = normalize_colname(col)
-        match = norm_df_cols.get(norm_col)
-        if match:
-            actual_cols.append(match)
-        else:
-            # Try fuzzy match: ignore all whitespace and case
-            norm_col_nospace = re.sub(r'\s+', '', norm_col)
-            for df_norm, df_orig in norm_df_cols.items():
-                if re.sub(r'\s+', '', df_norm) == norm_col_nospace:
-                    actual_cols.append(df_orig)
+    
+    def normalize_string(s):
+        if pd.isna(s):
+            return ""
+        s = str(s)
+        s = s.replace('and goals ', '')
+        s = s.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&quot;', '"').replace('&#39;', "'")
+        s = re.sub(r'\s+', ' ', s)
+        s = re.sub(r'[^\w\s]', '', s)
+        return s.strip().lower()
+    
+    task_scale_cols = {task: {'Scale 1': None, 'Scale 2': None} for task in tasks}
+    
+    for task in tasks:
+        norm_task = normalize_string(task)
+        for scale_tag in ['Scale 1', 'Scale 2']:
+            norm_scale = normalize_string(scale_tag)
+            norm_phase = normalize_string(PHASE_KEY_TO_COLUMN_PHASE.get(phase_key, phase_key))
+            for col in df.columns:
+                norm_col = normalize_string(col)
+                if (norm_task in norm_col and 
+                    norm_phase in norm_col and 
+                    norm_scale in norm_col):
+                    task_scale_cols[task][scale_tag] = col
                     break
-            else:
-                actual_cols.append(None)
-    # Debug: Print unique values for each matched column
-    for col in actual_cols:
-        if col and col in df.columns:
-            print(f"[DEBUG] Unique values for '{col}': {df[col].unique()}")
-    # Prepare data for chart
-    data = {task: {scale: [] for scale in scales} for task in tasks}
-    for i, task in enumerate(tasks):
-        for j, scale in enumerate(scales):
-            col_idx = i * len(scales) + j
-            col = actual_cols[col_idx]
-            if col and col in df.columns:
-                counts = df[col].value_counts().to_dict()
-                data[task][scale] = counts
-            else:
-                data[task][scale] = {}
-    # Build data for horizontal bar chart
-    chart_data = []
-    for scale in scales:
-        values = [
-            data[task][scale].get('Very useful', 0) +
-            data[task][scale].get('Extremely useful', 0) +
-            data[task][scale].get('Moderately useful', 0) +
-            data[task][scale].get('Slightly useful', 0)
-            for task in tasks
-        ]
-        chart_data.append(values)
-    # Use Plotly Express for horizontal grouped bar
+            if task_scale_cols[task][scale_tag] is None:
+                for col in df.columns:
+                    norm_col = normalize_string(col)
+                    task_present = any(word in norm_col for word in norm_task.split() if len(word) > 3)
+                    phase_present = norm_phase in norm_col
+                    scale_present = norm_scale in norm_col
+                    if task_present and phase_present and scale_present:
+                        task_scale_cols[task][scale_tag] = col
+                        break
+    
+    data = {task: {'Useful': 0, 'Harmful': 0} for task in tasks}
+    useful_values = ['very useful', 'extremely useful', 'moderately useful', 'slightly useful']
+    harmful_values = ['very harmful', 'extremely harmful', 'moderately harmful', 'slightly harmful']
+    
+    for task in tasks:
+        col1 = task_scale_cols[task]['Scale 1']
+        col2 = task_scale_cols[task]['Scale 2']
+        if col1 and col1 in df.columns:
+            col_values = df[col1].dropna().astype(str).str.strip().str.lower()
+            useful_count = sum(col_values.isin(useful_values))
+            data[task]['Useful'] = useful_count
+        if col2 and col2 in df.columns:
+            col_values = df[col2].dropna().astype(str).str.strip().str.lower()
+            harmful_count = sum(col_values.isin(harmful_values))
+            data[task]['Harmful'] = harmful_count
+    
+    if all(v['Useful'] == 0 and v['Harmful'] == 0 for v in data.values()):
+        return create_no_data_figure("No data available for this phase.")
+    
     fig = go.Figure()
-    color_palette = qualitative.Plotly if len(scales) <= len(qualitative.Plotly) else qualitative.Light24
-    for idx, scale in enumerate(scales):
-        fig.add_trace(go.Bar(
-            y=tasks,
-            x=chart_data[idx],
-            name=scale,
-            orientation='h',
-            marker_color=color_palette[idx % len(color_palette)],
-            text=chart_data[idx],
-            textposition='auto',
-            hovertemplate='<b>%{y}</b><br>Scale: %{legendgroup}<br>Count: %{x}<extra></extra>',
-            legendgroup=scale
-        ))
+    tasks_list = list(data.keys())
+    useful_vals = [data[task]['Useful'] for task in tasks_list]
+    harmful_vals = [data[task]['Harmful'] for task in tasks_list]
+    
+    fig.add_trace(go.Bar(
+        y=tasks_list,
+        x=useful_vals,
+        name='Useful',
+        orientation='h',
+        marker_color='#2ca02c',
+        text=useful_vals,
+        textposition='auto',
+        legendgroup='Useful'
+    ))
+    
+    fig.add_trace(go.Bar(
+        y=tasks_list,
+        x=harmful_vals,
+        name='Harmful',
+        orientation='h',
+        marker_color='#d62728',
+        text=harmful_vals,
+        textposition='auto',
+        legendgroup='Harmful'
+    ))
+    
     fig.update_layout(
         barmode='group',
         title=None,
         yaxis_title="Task",
-        xaxis_title="Count (sum of all positive usefulness responses)",
+        xaxis_title="Count",
         showlegend=True,
         legend_title="Scale",
         template="plotly_white",
         height=500,
-        font=dict(size=13),
+        font=dict(size=15),
         margin=dict(l=120, r=20, t=40, b=40),
-        yaxis=dict(tickfont=dict(size=12), automargin=True),
-        xaxis=dict(tickfont=dict(size=12)),
+        yaxis=dict(tickfont=dict(size=18), automargin=True),
+        xaxis=dict(tickfont=dict(size=14), tickangle=-15),
     )
+    
     return fig
 
 def build_insights_page(df: pd.DataFrame) -> html.Div:
     """Build the insights page layout with cross-question analysis."""
-    # Debug: Print all column names
-    print("\nAvailable columns in DataFrame:")
-    for i, col in enumerate(df.columns):
-        print(f"{i+1}. {repr(col)}")
-
-    # Find awareness column by partial match
-    awareness_cols = [col for col in df.columns if "umbrella term" in col]
-    has_awareness = bool(awareness_cols)
-    if has_awareness:
-        awareness_col = awareness_cols[0]
-        implementation_col = "Does your organization incorporate sustainable development practices?"
-    else:
-        awareness_col = None
-        implementation_col = None
-
-    # Page title style
-    page_title_style = {
-        "color": PRIMARY_COLOR,
-        "border-bottom": f"2px solid {PRIMARY_COLOR}",
-        "padding-bottom": "0.5rem"
-    }
-    section_header_style = {
-        "color": PRIMARY_COLOR,
-        "margin-top": "2rem",
-        "margin-bottom": "1.5rem",
-        "font-size": "1.5rem",
-        "border-bottom": f"2px solid {PRIMARY_COLOR}",
-        "padding-bottom": "0.5rem"
-    }
-
-    # Awareness and Implementation section (only if available)
-    awareness_impact_section = None
-    organizational_factors_section = None
-    if has_awareness and implementation_col in df.columns:
-        def_aware_count = df[awareness_col].value_counts().get("Yes", 0)
-        total_def_responses = df[awareness_col].notna().sum()
-        def_aware_pct = round((def_aware_count / total_def_responses * 100) if total_def_responses > 0 else 0)
-        impl_count = df[implementation_col].value_counts().get("Yes", 0)
-        total_impl_responses = df[implementation_col].notna().sum()
-        impl_pct = round((impl_count / total_impl_responses * 100) if total_impl_responses > 0 else 0)
-        stats_row = dbc.Row([
-            dbc.Col(build_stat_card(
-                "Definition Awareness",
-                f"{def_aware_pct}%",
-                "bi-lightbulb-fill",
-                subtitle=f"{def_aware_count} out of {total_def_responses} respondents"
-            ), width=6),
-            dbc.Col(build_stat_card(
-                "Implementation Rate",
-                f"{impl_pct}%",
-                "bi-gear-fill",
-                subtitle=f"{impl_count} out of {total_impl_responses} organizations"
-            ), width=6),
-        ], className="mb-5 g-4")
-        awareness_impl_fig = create_awareness_implementation_chart(df)
-        training_impl_fig = create_training_implementation_chart(df)
-        discussion_impl_fig = create_discussion_implementation_chart(df)
-        awareness_impact_section = html.Div([
-            html.H4("Awareness and Implementation", style=section_header_style),
-            html.P(
-                "Analyze the relationship between awareness of digital sustainability "
-                "and its practical implementation in organizations.",
-                className="mb-4",
-                style={"color": "#666"}
-            ),
-            stats_row,
-            dbc.Row([
-                build_chart_card(
-                    "Impact of Definition Awareness on Implementation",
-                    awareness_impl_fig,
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This chart examines the correlation between understanding of digital sustainability concepts and actual implementation. ",
-                        "We calculate the percentage of organizations implementing sustainable practices within each awareness group (Yes/No). ",
-                        "The calculation uses cross-tabulation (contingency tables) with row-wise normalization to show the proportion of implementation ",
-                        "status for each level of awareness. This helps identify if organizations with better understanding are more likely to implement practices."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4"),
-            dbc.Row([
-                build_chart_card(
-                    "Impact of Training on Implementation",
-                    training_impl_fig,
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This visualization explores how training participation influences implementation rates. ",
-                        "Using cross-tabulation analysis, we compare the implementation rates between organizations where employees have/haven't participated in training. ",
-                        "The percentages are calculated by dividing the count of each implementation status by the total number of organizations in each training group. ",
-                        "This helps quantify the effectiveness of training programs in driving sustainable practices."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4"),
-            dbc.Row([
-                build_chart_card(
-                    "Impact of Discussion Frequency on Implementation",
-                    discussion_impl_fig,
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This chart analyzes how the frequency of sustainability discussions correlates with implementation. ",
-                        "We use cross-tabulation to show the percentage of organizations implementing practices across different discussion frequency levels. ",
-                        "The analysis helps understand if more frequent discussions about sustainability translate to higher implementation rates, ",
-                        "suggesting the importance of organizational discourse in driving sustainable practices."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4")
-        ])
-        # Organizational factors section (only if available)
-        org_type_col = "Which of the following organizational types best describes your organization?"
-        goals_col = "Does your organization have specific digital sustainability goals or benchmarks for software development projects?"
-        csr_col = "Does your organization have a dedicated sustainability or Corporate Social Responsibility (CSR) expert, team or department?"
-        practices_col = "Does your organization incorporate sustainable development practices?"
-        if all(col in df.columns for col in [org_type_col, goals_col, csr_col, practices_col]):
-            org_type_fig = create_org_type_sustainability_chart(df)
-            org_goals_fig = create_org_goals_practices_chart(df)
-            org_csr_fig = create_org_csr_practices_chart(df)
-            has_goals_count = df[goals_col].value_counts().get("Yes", 0)
-            has_csr_count = df[csr_col].value_counts().get("Yes", 0)
-            total_orgs = len(df)
-            goals_pct = round((has_goals_count / total_orgs * 100) if total_orgs > 0 else 0)
-            csr_pct = round((has_csr_count / total_orgs * 100) if total_orgs > 0 else 0)
-            org_stats_row = dbc.Row([
-                dbc.Col(build_stat_card(
-                    "Have Sustainability Goals",
-                    f"{goals_pct}%",
-                    "bi-bullseye",
-                    subtitle=f"{has_goals_count} out of {total_orgs} organizations"
-                ), width=6),
-                dbc.Col(build_stat_card(
-                    "Have CSR Team/Expert",
-                    f"{csr_pct}%",
-                    "bi-people-fill",
-                    subtitle=f"{has_csr_count} out of {total_orgs} organizations"
-                ), width=6),
-            ], className="mb-5 g-4")
-            organizational_factors_section = html.Div([
-                html.H4("Organizational Factors", style=section_header_style),
-                html.P(
-                    "Explore how organizational characteristics influence "
-                    "digital sustainability practices and outcomes.",
-                    className="mb-4",
-                    style={"color": "#666"}
-                ),
-                org_stats_row,
-                dbc.Row([
-                    build_chart_card(
-                        "Sustainability Implementation by Organization Type",
-                        org_type_fig,
-                        12
-                    ),
-                    html.Div([
-                        html.H6("Analysis Methodology:", className="mt-3"),
-                        html.P([
-                            "This visualization breaks down sustainability implementation rates across different organization types. ",
-                            "Using cross-tabulation with row-wise normalization, we calculate the percentage of organizations implementing sustainable practices within each organization type. ",
-                            "This analysis helps identify which sectors are leading in sustainability adoption and where there might be room for improvement. ",
-                            "The percentages are calculated by dividing the count of each implementation status by the total number of organizations of each type."
-                        ], style={"color": "#666"})
-                    ], className="px-4 pb-4")
-                ], className="mb-5 g-4"),
-                dbc.Row([
-                    build_chart_card(
-                        "Impact of Having Sustainability Goals",
-                        org_goals_fig,
-                        12
-                    ),
-                    html.Div([
-                        html.H6("Analysis Methodology:", className="mt-3"),
-                        html.P([
-                            "This chart examines the relationship between having formal sustainability goals and actual implementation. ",
-                            "We use contingency table analysis to compare implementation rates between organizations with and without specific sustainability goals. ",
-                            "The percentages show what proportion of organizations in each group (with/without goals) are implementing sustainable practices. ",
-                            "This helps quantify how formal goal-setting influences practical implementation."
-                        ], style={"color": "#666"})
-                    ], className="px-4 pb-4")
-                ], className="mb-5 g-4"),
-                dbc.Row([
-                    build_chart_card(
-                        "Impact of Having CSR Team/Expert",
-                        org_csr_fig,
-                        12
-                    ),
-                    html.Div([
-                        html.H6("Analysis Methodology:", className="mt-3"),
-                        html.P([
-                            "This visualization analyzes how having dedicated sustainability resources affects implementation. ",
-                            "Using cross-tabulation, we compare implementation rates between organizations with and without CSR teams/experts. ",
-                            "The percentages represent the proportion of organizations implementing practices within each group. ",
-                            "This helps understand the value of dedicated sustainability resources in driving implementation."
-                        ], style={"color": "#666"})
-                    ], className="px-4 pb-4")
-                ], className="mb-5 g-4")
-            ])
-
-    # Role-based, barriers/drivers, and grouped usefulness/harmfulness charts (always shown)
-    # Use fallback for implementation_col if not available
-    fallback_impl_col = "Does your organization incorporate sustainable development practices?"
-    role_based_section = None
-    barriers_drivers_section = None
-    if fallback_impl_col in df.columns:
-        implementation_col = fallback_impl_col
-        total_respondents = len(df)
-        implements_sustainability = df[implementation_col].value_counts().get("Yes", 0)
-        implementation_rate = round((implements_sustainability / total_respondents * 100) if total_respondents > 0 else 0)
-        role_impl_fig = create_role_implementation_chart(df)
-        role_drivers_fig = create_role_drivers_chart(df)
-        role_barriers_fig = create_role_barriers_chart(df)
-        role_stats_row = dbc.Row([
-            dbc.Col(build_stat_card(
-                "Overall Implementation Rate",
-                f"{implementation_rate}%",
-                "bi-person-workspace",
-                subtitle=f"{implements_sustainability} out of {total_respondents} respondents"
-            ), width=12),
-        ], className="mb-5 g-4")
-        role_based_section = html.Div([
-            html.H4("Role-Based Analysis", style=section_header_style),
-            html.P(
-                "Understand how different roles perceive and implement "
-                "digital sustainability practices.",
-                className="mb-4",
-                style={"color": "#666"}
-            ),
-            role_stats_row,
-            dbc.Row([
-                build_chart_card(
-                    "Implementation by Role",
-                    role_impl_fig,
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This visualization shows how sustainability implementation varies across different professional roles. ",
-                        "Using cross-tabulation with row-wise normalization, we calculate the percentage of individuals in each role who incorporate sustainability practices. ",
-                        "This helps identify which roles are most actively engaged in sustainability implementation and where there might be opportunities for improvement. ",
-                        "The percentages represent the proportion of individuals implementing practices within each role category."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4"),
-            dbc.Row([
-                build_chart_card(
-                    "Drivers by Role",
-                    role_drivers_fig,
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This heatmap visualizes what drives sustainability implementation across different roles. ",
-                        "For each role-driver combination, we calculate the percentage of respondents who selected that driver. ",
-                        "The color intensity represents the percentage, with darker colors indicating higher percentages. ",
-                        "This analysis helps understand what motivates different roles to implement sustainable practices and can inform role-specific strategies."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4"),
-            dbc.Row([
-                build_chart_card(
-                    "Barriers by Role",
-                    role_barriers_fig,
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This heatmap shows the barriers to sustainability implementation faced by different roles. ",
-                        "For each role-barrier combination, we calculate the percentage of respondents who identified that barrier. ",
-                        "The color intensity indicates the percentage, with darker colors showing higher percentages. ",
-                        "This analysis helps identify role-specific challenges and can guide targeted interventions to overcome these barriers."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4")
-        ])
-        barriers_drivers_section = html.Div([
-            html.H4("Barriers and Drivers Analysis", style=section_header_style),
-            html.P(
-                "Analyze the relationships between various barriers and drivers "
-                "across different organizational contexts.",
-                className="mb-4",
-                style={"color": "#666"}
-            ),
-            dbc.Row([
-                build_chart_card(
-                    "Barriers by Organization Type",
-                    create_barriers_by_org_type_chart(df),
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This heatmap visualizes how different barriers to sustainability implementation vary across organization types. ",
-                        "For each organization type-barrier combination, we calculate the percentage of respondents who identified that barrier. ",
-                        "The color intensity represents the percentage, with darker colors indicating higher percentages. ",
-                        "This analysis helps identify which barriers are most prevalent in different organizational contexts."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4"),
-            dbc.Row([
-                build_chart_card(
-                    "Drivers by Organization Type",
-                    create_drivers_by_org_type_chart(df),
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This heatmap shows how different drivers of sustainability implementation vary across organization types. ",
-                        "For each organization type-driver combination, we calculate the percentage of respondents who selected that driver. ",
-                        "The color intensity represents the percentage, with darker colors showing higher percentages. ",
-                        "This analysis helps understand what motivates sustainability implementation in different organizational contexts."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4"),
-            dbc.Row([
-                build_chart_card(
-                    "Correlation between Barriers and Drivers",
-                    create_barriers_drivers_correlation_chart(df),
-                    12
-                ),
-                html.Div([
-                    html.H6("Analysis Methodology:", className="mt-3"),
-                    html.P([
-                        "This correlation matrix explores the relationships between barriers and drivers of sustainability implementation. ",
-                        "We calculate the correlation coefficient between each barrier-driver pair based on whether respondents selected them. ",
-                        "Positive correlations (red) indicate that the barrier and driver tend to be selected together, ",
-                        "while negative correlations (blue) suggest they tend to be selected separately. ",
-                        "This analysis helps identify potential relationships between obstacles and motivations."
-                    ], style={"color": "#666"})
-                ], className="px-4 pb-4")
-            ], className="mb-5 g-4")
-        ])
-
-    # --- Add grouped usefulness/harmfulness charts for each RE phase ---
-    task_impact_sections = []
-    for phase_key in GROUPED_TASK_SCALES.keys():
-        fig = make_task_scale_chart(df, phase_key)
-        task_impact_sections.append(html.Div([
-            html.H4(GROUPED_TASK_SCALES[phase_key]['question'], style=section_header_style),
-            dbc.Row([
-                build_chart_card(GROUPED_TASK_SCALES[phase_key]['question'], fig, 12)
-            ], className="mb-5 g-4"),
+    # Single-value insight charts
+    single_charts = []
+    for col in INSIGHTS_CHARTS:
+        if col not in df.columns:
+            continue
+        fig = generate_chart(df, col, chart_type='bar_h')  # Force horizontal
+        question_text = col.strip()
+        if question_text.endswith('?'):
+            question_text = question_text[:-1]
+        single_charts.append(html.Div([
+            html.H5(question_text, className="mb-3", style={"color": PRIMARY_COLOR, "fontWeight": 600, "fontSize": "1.25rem"}),
+            build_chart_card("", fig, 12)
         ]))
 
-    # Compose the page
-    children = [
-        html.H3("Insights & Cross-Question Analysis", className="mb-4 pt-3", style=page_title_style),
-        html.P(
-            "This section provides deeper insights by analyzing relationships "
-            "between different aspects of the survey responses.",
-            className="lead mb-5",
-            style={"color": "#666"}
-        ),
-    ]
-    if awareness_impact_section:
-        children.append(awareness_impact_section)
-    if organizational_factors_section:
-        children.append(organizational_factors_section)
-    if role_based_section:
-        children.append(role_based_section)
-    if barriers_drivers_section:
-        children.append(barriers_drivers_section)
-    children.append(html.Hr())
-    children.append(html.H3("GenAI Usefulness & Harmfulness for RE Tasks", className="mb-4 pt-3", style=page_title_style))
-    children.extend(task_impact_sections)
-    return html.Div(children) 
+    # Grouped training preferences
+    training_group = GROUPED_QUESTIONS["training_preferences"]
+    training_fig = generate_grouped_bar_chart(df, training_group['columns'], None)  # horizontal by default
+
+    # Task scale charts for each phase
+    task_scale_charts = []
+    for phase_key in GROUPED_TASK_SCALES.keys():
+        fig = make_task_scale_chart(df, phase_key)
+        phase_name = phase_key.replace('_', ' ').title()
+        task_scale_charts.append(html.Div([
+            html.H5(f"Usefulness/Harmfulness for {phase_name}", className="mb-3", style={"color": PRIMARY_COLOR, "fontWeight": 600, "fontSize": "1.25rem"}),
+            build_chart_card("", fig, 12)
+        ]))
+
+    return html.Div([
+        html.H3("Key Insights", className="mb-4 mt-2", style=SECTION_HEADER_STYLE),
+        html.Div([
+            html.H4("Single-Choice Insights", className="mb-3", style=SECTION_HEADER_STYLE),
+            *single_charts
+        ]),
+        html.Div([
+            html.H4("Training Preferences", className="mb-3", style=SECTION_HEADER_STYLE),
+            html.H5("Which training format would you prefer?", className="mb-3", style={"color": PRIMARY_COLOR, "fontWeight": 600, "fontSize": "1.25rem"}),
+            build_chart_card("", training_fig, 12)
+        ]),
+        html.Div([
+            html.H4("Usefulness/Harmfulness of GenAI for RE Tasks", className="mb-3", style=SECTION_HEADER_STYLE),
+            *task_scale_charts
+        ])
+    ]) 

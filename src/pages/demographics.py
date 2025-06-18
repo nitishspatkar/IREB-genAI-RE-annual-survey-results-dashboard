@@ -3,22 +3,31 @@
 import pandas as pd
 import dash_bootstrap_components as dbc
 from dash import html
-from src.config import DEMOGRAPHIC_COLS, APPLICATION_DOMAIN_COLS, GROUPED_QUESTIONS
+from src.config.config import DEMOGRAPHIC_COLS, APPLICATION_DOMAIN_COLS, GROUPED_QUESTIONS
 from src.components.charts import generate_chart, generate_grouped_bar_chart
 from src.components.layout import build_chart_card, build_chart_grid
 
+PRIMARY_COLOR = "#831E82"
+SECTION_HEADER_STYLE = {
+    "color": PRIMARY_COLOR,
+    "marginTop": "2.5rem",
+    "marginBottom": "1.2rem",
+    "fontSize": "1.2rem",
+    "fontWeight": 600,
+    "borderBottom": f"2px solid {PRIMARY_COLOR}",
+    "paddingBottom": "0.3rem"
+}
+CARD_ROW_STYLE = "mb-4 g-4"
+
 def build_demographics_page(df: pd.DataFrame) -> html.Div:
-    # Debug: Print unique values for the '[Other]' ChatGPT usage column
-    other_col = "How often do you use ChatGPT or similar AI chatbots? [Other]"
-    if other_col in df.columns:
-        print(f"[DEBUG] Unique values for '{other_col}': {df[other_col].unique()}")
-    # Single-value demographic questions (not grouped)
-    single_cols = [col for col in DEMOGRAPHIC_COLS if not any(col in group['columns'] for group in GROUPED_QUESTIONS.values())]
+    """Build the demographics page layout for GenAI RE survey."""
+    region_cols = set(GROUPED_QUESTIONS["regions"]["columns"])
     chart_info = []
-    for col in single_cols:
-        # Robustly skip '[Other]' charts if all values are missing or empty, or if the main question is not present
+    for col in DEMOGRAPHIC_COLS:
         if col not in df.columns:
             continue
+        if col in region_cols:
+            continue  # Skip region columns here, only show grouped chart below
         if col.endswith('[Other]'):
             main_col = col.replace(' [Other]', '')
             if main_col not in DEMOGRAPHIC_COLS or main_col not in df.columns:
@@ -29,17 +38,36 @@ def build_demographics_page(df: pd.DataFrame) -> html.Div:
             non_empty = series.dropna().astype(str).str.strip()
             if (non_empty == '').all():
                 continue
-        fig = generate_chart(df, col, chart_type='bar')
-        chart_info.append((col, fig))
+        question_text = col.strip()
+        if question_text.endswith('?'):
+            question_text = question_text[:-1]
+        fig = generate_chart(df, col, chart_type='bar_h')
+        chart_info.append(html.Div([
+            html.H5(question_text, className="mb-3", style={"color": PRIMARY_COLOR, "fontWeight": 600, "fontSize": "1.25rem"}),
+            build_chart_card("", fig, 12)
+        ]))
+
     # Grouped questions: regions, roles, application domains
     grouped_cards = []
-    for key in ["regions", "roles", "application_domains"]:
+    # Regions as a single grouped chart with a large header
+    region_group = GROUPED_QUESTIONS["regions"]
+    region_fig = generate_grouped_bar_chart(df, region_group['columns'], None)
+    grouped_cards.append(html.Div([
+        html.H5(region_group['question'], className="mb-3", style={"color": PRIMARY_COLOR, "fontWeight": 600, "fontSize": "1.25rem"}),
+        build_chart_card("", region_fig, 12)
+    ]))
+    # Roles and application domains
+    for key, label in zip(["roles", "application_domains"], ["Roles", "Application Domains"]):
         group = GROUPED_QUESTIONS[key]
-        fig = generate_grouped_bar_chart(df, group['columns'], group['question'])
-        card = build_chart_card(group['question'], fig)
-        grouped_cards.append(card)
+        fig = generate_grouped_bar_chart(df, group['columns'], None)
+        grouped_cards.append(html.Div([
+            html.H5(label, className="mb-3", style={"color": PRIMARY_COLOR, "fontWeight": 600, "fontSize": "1.25rem"}),
+            build_chart_card("", fig, 12)
+        ]))
+
     return html.Div([
-        html.H3("Demographics", className="mb-4 mt-2"),
-        *build_chart_grid(chart_info, cards_per_row=2),
-        dbc.Row([dbc.Col(card, width=6) for card in grouped_cards], className="mb-4 g-4"),
+        html.H3("Demographics", className="mb-4 mt-2", style=SECTION_HEADER_STYLE),
+        *chart_info,
+        html.H4("Regions, Roles, and Application Domains", className="mb-3", style=SECTION_HEADER_STYLE),
+        *grouped_cards,
     ]) 

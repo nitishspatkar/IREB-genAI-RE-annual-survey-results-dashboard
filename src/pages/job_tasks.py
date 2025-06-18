@@ -10,14 +10,7 @@ from src.components.charts import (
     make_multi_select_bar
 )
 from src.components.layout import build_stat_card, build_chart_card
-from src.config import (
-    PRIMARY_COLOR,
-    JOB_TASK_COLS,
-    JOB_TASK_MULTI_DRIVES,
-    JOB_TASK_MULTI_HINDER,
-    JOB_TASK_MULTI_KNOWLEDGE,
-    JOB_TASK_MULTI_SUPPORT
-)
+from src.config.config import *
 
 def build_job_tasks_page(df: pd.DataFrame) -> html.Div:
     """Build the job tasks page layout."""

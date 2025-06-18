@@ -5,14 +5,15 @@ from dash import html
 import dash_bootstrap_components as dbc
 from dash import dcc, Input, Output
 
-from src.config import CONTENT_STYLE, YEAR_TO_FILE, AVAILABLE_YEARS
+from src.config.config import CONTENT_STYLE, YEAR_TO_FILE, AVAILABLE_YEARS
 from src.components.layout import create_sidebar
 from src.utils.data_processing import load_data_file
 from src.pages.demographics import build_demographics_page
-from src.pages.experience import build_experience_page
+# from src.pages.experience import build_experience_page  # Experience page removed
 from src.pages.genai_usage import build_genai_usage_page
 from src.pages.barriers import build_barriers_page
 from src.pages.insights import build_insights_page
+from src.pages.open_ended import build_open_ended_page
 # (Add more imports for new sections as needed)
 
 # Initialize the Dash app
@@ -48,14 +49,14 @@ def render_page_and_sidebar(pathname: str, selected_year: int):
     # Route to the appropriate page
     if pathname == "/":
         content = dbc.Container([build_demographics_page(df)], fluid=True)
-    elif pathname == "/experience":
-        content = dbc.Container([build_experience_page(df)], fluid=True)
     elif pathname == "/genai-usage":
         content = dbc.Container([build_genai_usage_page(df)], fluid=True)
     elif pathname == "/barriers":
         content = dbc.Container([build_barriers_page(df)], fluid=True)
     elif pathname == "/insights":
         content = dbc.Container([build_insights_page(df)], fluid=True)
+    elif pathname == "/open-ended":
+        content = dbc.Container([build_open_ended_page(df)], fluid=True)
     else:
         content = dbc.Container(
             [

@@ -4,12 +4,7 @@ from typing import List, Dict, Tuple, Union
 import dash_bootstrap_components as dbc
 from dash import html, dcc
 
-from src.config import (
-    STYLE_VARS,
-    PRIMARY_COLOR,
-    SIDEBAR_STYLE,
-    AVAILABLE_YEARS
-)
+from src.config.config import *
 
 def clean_title(title: str) -> str:
     """Clean and standardize title text for consistent display."""
@@ -48,24 +43,25 @@ def build_chart_card(
     className: str = "mb-4"
 ) -> dbc.Col:
     """Wraps a plotly figure in a Bootstrap card with custom styling."""
+    # If the chart has no title or the title is the same as the section/question header, don't show the card header
+    show_header = bool(title and title.strip())
+    fig.update_layout(
+        font=dict(family=STYLE_VARS["FONT_FAMILY"], size=STYLE_VARS["FONT_SIZE"]),
+    )
+    card_content = []
+    if show_header:
+        card_content.append(dbc.CardHeader(title, style={"background": PRIMARY_COLOR, "color": "white", "font-weight": "bold"}))
+    card_content.append(
+        dbc.CardBody(
+            dcc.Graph(figure=fig, config={'displayModeBar': False}),
+            style={"background": STYLE_VARS["BACKGROUND_COLOR"]}
+        )
+    )
     return dbc.Col(
-        dbc.Card([
-            dbc.CardHeader(
-                html.H5(clean_title(title), className="card-title mb-0"),
-                className="card-header-primary border-bottom-0",
-                style={"font-size": "1rem", "font-weight": "500"}
-            ),
-            dbc.CardBody(
-                dcc.Graph(
-                    figure=fig,
-                    config={
-                        'displayModeBar': False,
-                        'staticPlot': True  # This disables all interactivity including hover
-                    }
-                ),
-                className="pt-0"  # Remove top padding since header has no border
-            )
-        ], className="shadow-sm h-100 border-0"),
+        dbc.Card(
+            card_content,
+            className="shadow-sm h-100"
+        ),
         width=column_width,
         className=className
     )
@@ -178,10 +174,6 @@ def create_sidebar(selected_year=None):
                 "Demographics"
             ], href="/", active="exact"),
             dbc.NavLink([
-                html.I(className="bi bi-bar-chart-fill me-2"),
-                "Experience"
-            ], href="/experience", active="exact"),
-            dbc.NavLink([
                 html.I(className="bi bi-cpu me-2"),
                 "GenAI Usage"
             ], href="/genai-usage", active="exact"),
@@ -193,5 +185,9 @@ def create_sidebar(selected_year=None):
                 html.I(className="bi bi-lightbulb me-2"),
                 "Insights"
             ], href="/insights", active="exact"),
+            dbc.NavLink([
+                html.I(className="bi bi-chat-text me-2"),
+                "Open-Ended Responses"
+            ], href="/open-ended", active="exact"),
         ], vertical=True, pills=True),
     ], style=SIDEBAR_STYLE) 

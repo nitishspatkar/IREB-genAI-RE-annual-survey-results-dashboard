@@ -10,25 +10,20 @@ from src.components.charts import (
     make_multi_select_bar
 )
 from src.components.layout import build_stat_card, build_chart_card
-from src.config import (
-    PRIMARY_COLOR,
-    ORGANIZATION_COLS,
-    ORG_MULTI_TRAINING,
-    ORG_MULTI_DIMENSIONS
-)
+from src.config.config import *
 
 def build_organization_page(df: pd.DataFrame) -> html.Div:
     """Build the organization page layout."""
-    # Debug: Print all column names
-    print("\nAvailable columns in DataFrame:")
-    for i, col in enumerate(df.columns):
-        print(f"{i+1}. {repr(col)}")
-    
     # Find dimension columns by partial match
-    dimension_cols = [col for col in df.columns if "dimensions of sustainability" in col and any(dim in col for dim in ["Environmental", "Social", "Individual", "Economic", "Technical"])]
-    print("\nFound dimension columns:")
-    for col in dimension_cols:
-        print(repr(col))
+    dimension_cols = [col for col in df.columns if "dimension" in col.lower()]
+    
+    # Use the exact dimension columns from ORGANIZATION_MULTI_DIMENSIONS
+    dimension_cols = [
+        'Which dimensions of digital sustainability does your organization consider in software development projects?  [Environmental impact (e.g., energy consumption, carbon footprint)]',
+        'Which dimensions of digital sustainability does your organization consider in software development projects?  [Social impact (e.g., accessibility, inclusivity, user well-being)]',
+        'Which dimensions of digital sustainability does your organization consider in software development projects?  [Economic impact (e.g., cost efficiency, resource optimization)]',
+        'Which dimensions of digital sustainability does your organization consider in software development projects?  [Technical impact (e.g., maintainability, scalability, performance)]'
+    ]
     
     # Define column names
     goals_col = "Does your organization have specific digital sustainability goals or benchmarks for software development projects?"
