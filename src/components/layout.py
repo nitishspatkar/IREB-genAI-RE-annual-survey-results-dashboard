@@ -172,22 +172,27 @@ def create_sidebar(selected_year=None):
             dbc.NavLink([
                 html.I(className="bi bi-people-fill me-2"),
                 "Demographics"
-            ], href="/", active="exact"),
+            ], href="/", active="exact", className="nav-link-custom"),
             dbc.NavLink([
                 html.I(className="bi bi-cpu me-2"),
                 "GenAI Usage"
-            ], href="/genai-usage", active="exact"),
+            ], href="/genai-usage", active="exact", className="nav-link-custom"),
             dbc.NavLink([
                 html.I(className="bi bi-exclamation-triangle-fill me-2"),
                 "Barriers"
-            ], href="/barriers", active="exact"),
+            ], href="/barriers", active="exact", className="nav-link-custom"),
             dbc.NavLink([
                 html.I(className="bi bi-lightbulb me-2"),
                 "Insights"
-            ], href="/insights", active="exact"),
+            ], href="/insights", active="exact", className="nav-link-custom"),
             dbc.NavLink([
                 html.I(className="bi bi-chat-text me-2"),
                 "Open-Ended Responses"
-            ], href="/open-ended", active="exact"),
-        ], vertical=True, pills=True),
+            ], href="/open-ended", active="exact", className="nav-link-custom"),
+        ], vertical=True, pills=True, style={
+            "background": "#831E82",
+            "borderRadius": "0.5rem",
+            "padding": "0.5rem",
+            "boxShadow": "0 2px 8px rgba(131,30,130,0.08)"
+        }),
     ], style=SIDEBAR_STYLE) 
