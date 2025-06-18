@@ -163,7 +163,7 @@ def create_sidebar(selected_year=None):
         dcc.Dropdown(
             id='year-dropdown',
             options=[{'label': str(year), 'value': year} for year in AVAILABLE_YEARS],
-            value=selected_year or AVAILABLE_YEARS[0],
+            value=selected_year,
             clearable=False,
             style={'margin-bottom': '1rem'}
         ),

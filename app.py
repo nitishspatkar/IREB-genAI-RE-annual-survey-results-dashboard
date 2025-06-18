@@ -38,9 +38,9 @@ def render_page_and_sidebar(pathname: str, selected_year: int):
     """
     Render the sidebar and appropriate page content based on the URL pathname and selected year.
     """
-    # Default to latest year if not set
+    # Default to 2025 if not set
     if not selected_year:
-        selected_year = max(AVAILABLE_YEARS)
+        selected_year = 2025
     # Load data for the selected year
     data_file = YEAR_TO_FILE.get(selected_year)
     df = load_data_file(data_file)
