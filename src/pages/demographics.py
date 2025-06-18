@@ -1,11 +1,10 @@
 """Demographics page module."""
 
 import pandas as pd
-import dash_bootstrap_components as dbc
 from dash import html
-from src.config.config import DEMOGRAPHIC_COLS, APPLICATION_DOMAIN_COLS, GROUPED_QUESTIONS
+from src.config.config import DEMOGRAPHIC_COLS, GROUPED_QUESTIONS
 from src.components.charts import generate_chart, generate_grouped_bar_chart
-from src.components.layout import build_chart_card, build_chart_grid
+from src.components.layout import build_chart_card
 
 PRIMARY_COLOR = "#831E82"
 SECTION_HEADER_STYLE = {

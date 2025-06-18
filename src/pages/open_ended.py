@@ -1,4 +1,3 @@
-import dash_bootstrap_components as dbc
 from dash import html
 from src.config.open_ended import OPEN_ENDED_COLS
 

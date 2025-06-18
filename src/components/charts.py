@@ -1,10 +1,9 @@
 """Chart creation components for the dashboard."""
 
-from typing import List, Dict, Optional, Union
+from typing import List, Optional
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from collections import defaultdict
 from wordcloud import WordCloud, STOPWORDS
 import collections
 import re
@@ -681,7 +680,6 @@ def generate_task_scale_chart(df: pd.DataFrame, grouped_task_scales: dict) -> go
     
     # Collect data from all phases
     all_data = []
-    phase_names = []
     
     for phase_key, phase_data in grouped_task_scales.items():
         tasks = phase_data['tasks']

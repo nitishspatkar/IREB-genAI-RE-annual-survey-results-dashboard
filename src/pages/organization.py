@@ -4,11 +4,7 @@ import pandas as pd
 import dash_bootstrap_components as dbc
 from dash import html
 
-from src.components.charts import (
-    generate_chart,
-    make_donut_chart,
-    make_multi_select_bar
-)
+from src.components.charts import generate_chart
 from src.components.layout import build_stat_card, build_chart_card
 from src.config.config import *
 

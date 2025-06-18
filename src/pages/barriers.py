@@ -1,4 +1,3 @@
-import dash_bootstrap_components as dbc
 from dash import html
 from src.config.config import GROUPED_QUESTIONS
 from src.components.charts import generate_grouped_bar_chart

@@ -2,10 +2,8 @@
 
 import pandas as pd
 import dash_bootstrap_components as dbc
-from dash import html, dcc
 
 from src.components.charts import (
-    generate_chart,
     make_donut_chart,
     make_multi_select_bar
 )

@@ -1,8 +1,7 @@
-import dash_bootstrap_components as dbc
 from dash import html
 from src.config.config import GENAI_USAGE_COLS, GENAI_RE_DISCIPLINE_COLS, GROUPED_QUESTIONS
 from src.components.charts import generate_chart, generate_grouped_bar_chart
-from src.components.layout import build_chart_card, build_chart_grid
+from src.components.layout import build_chart_card
 
 PRIMARY_COLOR = "#831E82"
 SECTION_HEADER_STYLE = {

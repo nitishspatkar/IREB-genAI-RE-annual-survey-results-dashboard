@@ -4,7 +4,6 @@ import pandas as pd
 import re
 from typing import Optional, Union, List
 import os
-from src.config.config import STYLE_VARS, PRIMARY_COLOR
 
 def dedup_column_names(columns: List[str]) -> List[str]:
     """
